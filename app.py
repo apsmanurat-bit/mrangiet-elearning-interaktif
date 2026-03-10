@@ -1,59 +1,32 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Konfigurasi Halaman
 st.set_page_config(page_title="E-Learning Interaktif", layout="wide")
 
-# API KEY (Langsung pakai milik Anda)
+# API KEY MILIK ANDA
 API_KEY = "AIzaSyC6cVc6kfcMaPu5H25UmB73RMTlbwt1nR0"
 genai.configure(api_key=API_KEY)
 
-# Sidebar
 st.sidebar.title("📚 Menu Belajar")
-menu = st.sidebar.radio("Pilih Halaman:", ["🏠 Beranda", "📖 Materi Kuliah", "🤖 Tanya Asisten AI", "📝 Kuis"])
+menu = st.sidebar.radio("Pilih Halaman:", ["🏠 Beranda", "🤖 Tanya Asisten AI"])
 
-# --- HALAMAN BERANDA ---
 if menu == "🏠 Beranda":
-    st.title("🌟 Selamat Datang di Platform E-Learning")
-    nama = st.text_input("Masukkan Nama Anda:")
-    if nama:
-        st.success(f"Selamat belajar, {nama}!")
+    st.title("Selamat Datang")
+    st.write("Silakan buka menu Tanya Asisten AI untuk mengetes.")
 
-# --- HALAMAN MATERI ---
-elif menu == "📖 Materi Kuliah":
-    st.title("📖 Materi: Pendidikan Kewarganegaraan")
-    st.write("Identitas nasional adalah jati diri bangsa.")
-
-# --- HALAMAN ASISTEN AI ---
 elif menu == "🤖 Tanya Asisten AI":
-    st.title("🤖 Asisten AI Pintar")
-    pertanyaan = st.text_input("Ketik pertanyaan Anda di sini:")
+    st.title("🤖 Debug Mode AI")
+    pertanyaan = st.text_input("Ketik pertanyaan tes:")
     
     if pertanyaan:
-        with st.spinner("Sedang mencari jawaban..."):
-            # STRATEGI 3 TAHAP: Mencoba model satu per satu sampai berhasil
-            success = False
-            # Daftar model yang akan dicoba (dari yang tercanggih ke yang paling stabil)
-            model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-            
-            for name in model_names:
-                if not success:
-                    try:
-                        model = genai.GenerativeModel(name)
-                        response = model.generate_content(pertanyaan)
-                        st.markdown(f"### Jawaban (Model: {name}):")
-                        st.write(response.text)
-                        success = True
-                    except Exception:
-                        continue # Jika gagal, coba model berikutnya
-            
-            if not success:
-                st.error("Semua model AI sedang sibuk atau API Key belum aktif. Mohon tunggu 5-10 menit lalu coba lagi, atau pastikan 'Generative AI' sudah diaktifkan di Google AI Studio Anda.")
-
-# --- HALAMAN KUIS ---
-elif menu == "📝 Kuis":
-    st.title("📝 Kuis")
-    jawaban = st.radio("Semboyan Indonesia?", ["Bhinneka Tunggal Ika", "Merdeka"])
-    if st.button("Cek"):
-        if jawaban == "Bhinneka Tunggal Ika":
-            st.success("Benar!")
+        with st.spinner("Mencoba menghubungi Google AI..."):
+            try:
+                # Kita pakai model yang paling dasar dan pasti ada
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content(pertanyaan)
+                st.write("### Jawaban AI:")
+                st.write(response.text)
+            except Exception as e:
+                st.error("Terjadi Kesalahan Teknis!")
+                st.info(f"Pesan Error dari Google: {str(e)}")
+                st.warning("Jika errornya 'API_KEY_INVALID', berarti kuncinya salah salin. Jika 'Location not supported', berarti butuh sedikit setting tambahan.")
