@@ -26,7 +26,6 @@ def ambil_data_mahasiswa():
         df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
         return df
     except Exception as e:
-        st.error(f"⚠️ Gagal menarik data dari Google Sheets. Pastikan link sudah 'Siapa saja bisa lihat'.")
         return pd.DataFrame(columns=['NAMA', 'MATA_KULIAH', 'STATUS'])
 
 # Simpan Nilai di Memori Sesi
@@ -87,24 +86,22 @@ else:
                     if jawaban_mhs:
                         with st.spinner("AI sedang mengoreksi..."):
                             try:
-                                # PERBAIKAN: Gunakan model 'gemini-pro' sebagai cadangan
-                                try:
-                                    model = genai.GenerativeModel('gemini-1.5-flash')
-                                    prompt = f"Berikan nilai angka saja (0-100) untuk jawaban mahasiswa di matkul {matkul_pilihan}: {jawaban_mhs}"
-                                    response = model.generate_content(prompt)
-                                except:
-                                    model = genai.GenerativeModel('gemini-pro')
-                                    prompt = f"Beri nilai angka 0-100 saja: {jawaban_mhs}"
-                                    response = model.generate_content(prompt)
+                                # MENGGUNAKAN NAMA MODEL PALING BARU & STABIL
+                                model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                                prompt = f"Beri nilai angka saja (0-100) untuk jawaban mahasiswa di matkul {matkul_pilihan}: {jawaban_mhs}. JANGAN BERI TEKS APAPUN."
+                                response = model.generate_content(prompt)
                                 
                                 skor = response.text.strip()
+                                # Pastikan skor hanya angka, jika ada teks ikut terambil
+                                skor_bersih = ''.join(filter(str.isdigit, skor))
+                                
                                 st.session_state.rekap_nilai.append({
                                     "Nama": nama_input, "Matkul": matkul_pilihan, 
-                                    "Ujian": jenis_tes, "Nilai": skor, "Jam": datetime.now().strftime("%H:%M")
+                                    "Ujian": jenis_tes, "Nilai": skor_bersih, "Jam": datetime.now().strftime("%H:%M")
                                 })
-                                st.success(f"Berhasil! Nilai Anda: {skor}")
+                                st.success(f"Berhasil! Nilai Anda: {skor_bersih}")
                             except Exception as e:
-                                st.error(f"Gagal mengoreksi: {e}")
+                                st.error(f"Gagal mengoreksi secara otomatis. Silakan lapor Bapak Dosen. (Error: {e})")
                     else:
                         st.error("Jawaban tidak boleh kosong!")
 
@@ -113,13 +110,11 @@ else:
             tanya = st.text_input("Ajukan pertanyaan materi:")
             if tanya:
                 try:
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
                     res = model.generate_content(tanya)
                     st.write(res.text)
-                except:
-                    model = genai.GenerativeModel('gemini-pro')
-                    res = model.generate_content(tanya)
-                    st.write(res.text)
+                except Exception as e:
+                    st.error(f"AI sedang sibuk. Silakan coba lagi nanti. ({e})")
 
 # --- 5. PANEL DOSEN ---
 if pwd_dosen == PASSWORD_DOSEN:
