@@ -6,7 +6,10 @@ st.set_page_config(page_title="Portal Akademik Bapak", layout="wide")
 
 # --- ID SPREADSHEET BAPAK YANG SUDAH SAYA CEK ---
 ID_SHEET = "10AY2akSXfTdG2hoNpqh65YTCgWZ9ZZIzC82POnVvyf8" 
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/pub?output=csv"
+SHEET_URL = # GANTI BAGIAN INI DI KODE app.py BAPAK
+ID_SHEET = "10AY2akSXfTdG2hoNpqh65YTCgWZ9ZZIzC82POnVvyf8"
+# Kode di bawah ini memaksa Google memberikan data meskipun settingan Bapak tadi "Halaman Web"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 
 # API KEY AI
 API_KEY = "AIzaSyC6cVc6kfcMaPu5H25UmB73RMTlbwt1nR0"
