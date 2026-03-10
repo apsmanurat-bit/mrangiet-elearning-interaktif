@@ -10,8 +10,8 @@ st.set_page_config(page_title="LMS Akademik Pak Guru", layout="wide")
 API_KEY = "AIzaSyC6cVc6kfcMaPu5H25UmB73RMTlbwt1nR0"
 genai.configure(api_key=API_KEY)
 
-# ID Google Sheets Bapak
-ID_SHEET = "10AY2akSXfTdG2hoNpqh65, YTCgWZ9ZZIzC82POnVvyf8"
+# --- ID SHEET (SUDAH DIPERBAIKI - TANPA KOMA/SPASI) ---
+ID_SHEET = "10AY2akSXfTdG2hoNpqh65YTCgWZ9ZZIzC82POnVvyf8"
 URL_DATA = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 
 # Password Rahasia Dosen
@@ -20,14 +20,19 @@ PASSWORD_DOSEN = "ADMIN123"
 # --- 2. AMBIL DATA SHEETS ---
 def ambil_data_mahasiswa():
     try:
+        # Menghindari cache agar data selalu update
         url_refresh = f"{URL_DATA}&refresh={datetime.now().timestamp()}"
         df = pd.read_csv(url_refresh)
         df.columns = df.columns.str.strip().str.upper()
-        df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+        # Bersihkan data dari spasi di depan/belakang
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                df[col] = df[col].str.strip()
         return df
-    except:
+    except Exception as e:
         return pd.DataFrame(columns=['NAMA', 'MATA_KULIAH', 'STATUS'])
 
+# Simpan Nilai di Memori Sesi
 if 'rekap_nilai' not in st.session_state:
     st.session_state.rekap_nilai = []
 
@@ -47,8 +52,9 @@ df_db = ambil_data_mahasiswa()
 
 if not nama_input:
     st.title("👋 Selamat Datang")
-    st.info("Silakan masukkan Nama Lengkap Anda di menu samping.")
+    st.info("Mahasiswa: Masukkan Nama Lengkap di samping.")
 else:
+    # Cari Mahasiswa (Case Insensitive)
     mhs_data = df_db[
         (df_db['NAMA'].str.lower() == nama_input.strip().lower()) & 
         (df_db['MATA_KULIAH'].str.lower() == matkul_pilihan.lower())
@@ -57,10 +63,14 @@ else:
     if mhs_data.empty:
         st.title("📝 Belum Terdaftar")
         st.error(f"Maaf {nama_input}, Anda belum terdaftar di kelas {matkul_pilihan}.")
+        st.write("Hubungi Dosen untuk didaftarkan di Google Sheets.")
+        
     elif "setuju" not in str(mhs_data.iloc[0]['STATUS']).lower():
         st.title("⏳ Akses Tertunda")
-        st.warning(f"Halo {nama_input}, status Anda masih 'Menunggu' di Google Sheets.")
+        st.warning(f"Halo {nama_input}, status Anda masih 'Menunggu'.")
+        
     else:
+        # --- AKSES DITERIMA ---
         st.sidebar.success(f"✅ AKTIF: {nama_input.upper()}")
         nav = st.sidebar.radio("Navigasi:", ["🏠 Beranda", "📖 Materi", "📝 Ujian", "🤖 Tanya AI"])
         
@@ -78,26 +88,24 @@ else:
                 if st.button("Kirim Jawaban"):
                     with st.spinner("Sistem sedang mengoreksi otomatis..."):
                         try:
-                            # MENGGUNAKAN NAMA MODEL YANG PALING UMUM (GEMINI-1.5-FLASH)
                             model = genai.GenerativeModel('gemini-1.5-flash')
-                            prompt = f"Berikan skor angka antara 0 sampai 100 berdasarkan kualitas jawaban mahasiswa berikut untuk mata kuliah {matkul_pilihan}: '{jawaban_mhs}'. Balas HANYA dengan angka saja."
-                            
+                            prompt = f"Beri nilai angka 0-100 untuk jawaban mahasiswa di matkul {matkul_pilihan}: {jawaban_mhs}. Balas HANYA dengan angka saja."
                             response = model.generate_content(prompt)
-                            # Membersihkan hasil agar hanya angka yang tersisa
+                            
                             skor_raw = response.text.strip()
+                            # Ambil angka saja, pastikan bukan kode error 403
                             skor = ''.join(filter(str.isdigit, skor_raw))
                             
-                            # Validasi: Jika skor yang keluar aneh (seperti 403 atau kosong)
                             if not skor or int(skor) > 100:
-                                skor = "Cek Manual"
+                                skor = "Nilai Manual"
 
                             st.session_state.rekap_nilai.append({
                                 "Nama": nama_input, "Matkul": matkul_pilihan, 
                                 "Ujian": jenis_tes, "Nilai": skor, "Waktu": datetime.now().strftime("%H:%M")
                             })
                             st.success(f"Ujian Terkirim! Skor Anda: {skor}")
-                        except Exception as e:
-                            st.error(f"Koneksi AI Terputus. Nilai akan diinput manual oleh Bapak Dosen.")
+                        except:
+                            st.error("Koneksi AI Sibuk. Nilai akan diinput manual.")
 
         elif nav == "🤖 Tanya AI":
             st.title("🤖 Asisten AI")
@@ -109,15 +117,15 @@ else:
                         res = model.generate_content(tanya)
                         st.write(res.text)
                     except:
-                        st.error("Layanan AI sedang sibuk.")
+                        st.error("AI sedang istirahat.")
 
 # --- 5. PANEL DOSEN ---
 if pwd_dosen == PASSWORD_DOSEN:
     st.markdown("---")
-    st.header("👨‍🏫 Rekap Nilai Dosen")
+    st.header("👨‍🏫 Panel Kontrol Dosen")
     if st.session_state.rekap_nilai:
         df_nilai = pd.DataFrame(st.session_state.rekap_nilai)
         st.table(df_nilai)
-        st.download_button("📥 Download Nilai (CSV)", df_nilai.to_csv(index=False), "nilai.csv")
+        st.download_button("📥 Download Nilai (CSV)", df_nilai.to_csv(index=False), "nilai_mahasiswa.csv")
     else:
         st.write("Belum ada data nilai masuk.")
