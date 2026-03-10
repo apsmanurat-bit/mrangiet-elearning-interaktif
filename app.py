@@ -25,10 +25,19 @@ def ambil_data_mahasiswa():
         df.columns = df.columns.str.strip().str.upper()
         df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
         return df
-    except Exception as e:
+    except:
         return pd.DataFrame(columns=['NAMA', 'MATA_KULIAH', 'STATUS'])
 
-# Simpan Nilai di Memori Sesi
+# Fungsi untuk mencari model yang tersedia (Anti-404)
+def dapatkan_model_aktif():
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                return m.name
+        return 'models/gemini-1.5-flash' # Fallback jika gagal list
+    except:
+        return 'models/gemini-1.5-flash'
+
 if 'rekap_nilai' not in st.session_state:
     st.session_state.rekap_nilai = []
 
@@ -50,7 +59,6 @@ if not nama_input:
     st.title("👋 Selamat Datang")
     st.info("Silakan masukkan Nama Lengkap Anda di menu samping.")
 else:
-    # Cari Mahasiswa
     mhs_data = df_db[
         (df_db['NAMA'].str.lower() == nama_input.strip().lower()) & 
         (df_db['MATA_KULIAH'].str.lower() == matkul_pilihan.lower())
@@ -63,7 +71,6 @@ else:
         st.title("⏳ Akses Tertunda")
         st.warning(f"Halo {nama_input}, status Anda masih 'Menunggu' di Google Sheets.")
     else:
-        # --- AKSES DITERIMA ---
         st.sidebar.success(f"✅ AKTIF: {nama_input.upper()}")
         nav = st.sidebar.radio("Navigasi:", ["🏠 Beranda", "📖 Materi", "📝 Ujian", "🤖 Tanya AI"])
         
@@ -77,44 +84,39 @@ else:
 
         elif nav == "📝 Ujian":
             st.title("✍️ Sesi Ujian")
-            st.warning("⚠️ Fitur Tanya AI dimatikan selama ujian.")
+            st.warning("⚠️ Fitur AI disembunyikan.")
             jenis_tes = st.selectbox("Pilih Jenis Ujian:", ["--- Pilih ---", "QUIZ 1", "QUIZ 2", "MID TEST", "FINAL TEST"])
             
             if jenis_tes != "--- Pilih ---":
-                jawaban_mhs = st.text_area("Tulis Jawaban Anda di sini:", height=200)
+                jawaban_mhs = st.text_area("Tulis Jawaban Anda:", height=200)
                 if st.button("Kirim Jawaban"):
-                    if jawaban_mhs:
-                        with st.spinner("AI sedang mengoreksi..."):
-                            try:
-                                # MENGGUNAKAN NAMA MODEL PALING BARU & STABIL
-                                model = genai.GenerativeModel('gemini-1.5-flash-latest')
-                                prompt = f"Beri nilai angka saja (0-100) untuk jawaban mahasiswa di matkul {matkul_pilihan}: {jawaban_mhs}. JANGAN BERI TEKS APAPUN."
-                                response = model.generate_content(prompt)
-                                
-                                skor = response.text.strip()
-                                # Pastikan skor hanya angka, jika ada teks ikut terambil
-                                skor_bersih = ''.join(filter(str.isdigit, skor))
-                                
-                                st.session_state.rekap_nilai.append({
-                                    "Nama": nama_input, "Matkul": matkul_pilihan, 
-                                    "Ujian": jenis_tes, "Nilai": skor_bersih, "Jam": datetime.now().strftime("%H:%M")
-                                })
-                                st.success(f"Berhasil! Nilai Anda: {skor_bersih}")
-                            except Exception as e:
-                                st.error(f"Gagal mengoreksi secara otomatis. Silakan lapor Bapak Dosen. (Error: {e})")
-                    else:
-                        st.error("Jawaban tidak boleh kosong!")
+                    with st.spinner("Mengoreksi..."):
+                        try:
+                            model_name = dapatkan_model_aktif()
+                            model = genai.GenerativeModel(model_name)
+                            prompt = f"Beri nilai angka 0-100 saja untuk jawaban ini: {jawaban_mhs}. HANYA ANGKA."
+                            response = model.generate_content(prompt)
+                            skor = ''.join(filter(str.isdigit, response.text))
+                            
+                            st.session_state.rekap_nilai.append({
+                                "Nama": nama_input, "Matkul": matkul_pilihan, 
+                                "Ujian": jenis_tes, "Nilai": skor, "Waktu": datetime.now().strftime("%H:%M")
+                            })
+                            st.success(f"Berhasil! Nilai Anda: {skor}")
+                        except Exception as e:
+                            st.error(f"Sistem koreksi sibuk, nilai akan diinput manual oleh Dosen. ({e})")
 
         elif nav == "🤖 Tanya AI":
             st.title("🤖 Asisten AI")
-            tanya = st.text_input("Ajukan pertanyaan materi:")
+            tanya = st.text_input("Tanya materi:")
             if tanya:
                 try:
-                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                    model_name = dapatkan_model_aktif()
+                    model = genai.GenerativeModel(model_name)
                     res = model.generate_content(tanya)
                     st.write(res.text)
-                except Exception as e:
-                    st.error(f"AI sedang sibuk. Silakan coba lagi nanti. ({e})")
+                except:
+                    st.error("Gagal memanggil AI.")
 
 # --- 5. PANEL DOSEN ---
 if pwd_dosen == PASSWORD_DOSEN:
@@ -123,6 +125,6 @@ if pwd_dosen == PASSWORD_DOSEN:
     if st.session_state.rekap_nilai:
         df_nilai = pd.DataFrame(st.session_state.rekap_nilai)
         st.table(df_nilai)
-        st.download_button("📥 Download Excel (CSV)", df_nilai.to_csv(index=False), "nilai_mahasiswa.csv")
+        st.download_button("📥 Download Nilai (CSV)", df_nilai.to_csv(index=False), "nilai.csv")
     else:
         st.write("Belum ada data nilai.")
