@@ -11,27 +11,13 @@ API_KEY = "AIzaSyC6cVc6kfcMaPu5H25UmB73RMTlbwt1nR0"
 genai.configure(api_key=API_KEY)
 
 # ID Google Sheets Bapak
-ID_SHEET = "10AY2akSXfTdG2hoNpqh65YTCgWZ9ZZIzC82POnVvyf8"
+ID_SHEET = "10AY2akSXfTdG2hoNpqh65, YTCgWZ9ZZIzC82POnVvyf8"
 URL_DATA = f"https://docs.google.com/spreadsheets/d/{ID_SHEET}/export?format=csv&gid=0"
 
 # Password Rahasia Dosen
 PASSWORD_DOSEN = "ADMIN123"
 
-# --- 2. FUNGSI DINAMIS MENCARI MODEL (ANTI-404) ---
-def panggil_ai(perintah):
-    try:
-        # Cari daftar model yang benar-benar aktif di akun Bapak saat ini
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                model_aktif = m.name
-                model = genai.GenerativeModel(model_aktif)
-                response = model.generate_content(perintah)
-                return response.text
-        return "Gagal: Tidak ada model aktif."
-    except Exception as e:
-        return f"Error Sistem: {str(e)}"
-
-# --- 3. AMBIL DATA SHEETS ---
+# --- 2. AMBIL DATA SHEETS ---
 def ambil_data_mahasiswa():
     try:
         url_refresh = f"{URL_DATA}&refresh={datetime.now().timestamp()}"
@@ -45,7 +31,7 @@ def ambil_data_mahasiswa():
 if 'rekap_nilai' not in st.session_state:
     st.session_state.rekap_nilai = []
 
-# --- 4. SIDEBAR ---
+# --- 3. SIDEBAR ---
 st.sidebar.title("🎓 Portal Akademik")
 nama_input = st.sidebar.text_input("Nama Lengkap Mahasiswa:")
 list_matkul = [
@@ -56,7 +42,7 @@ list_matkul = [
 matkul_pilihan = st.sidebar.selectbox("Pilih Mata Kuliah:", list_matkul)
 pwd_dosen = st.sidebar.text_input("Menu Dosen (Password):", type="password")
 
-# --- 5. LOGIKA UTAMA ---
+# --- 4. LOGIKA UTAMA ---
 df_db = ambil_data_mahasiswa()
 
 if not nama_input:
@@ -91,30 +77,41 @@ else:
                 jawaban_mhs = st.text_area("Tulis Jawaban Anda:", height=200)
                 if st.button("Kirim Jawaban"):
                     with st.spinner("Sistem sedang mengoreksi otomatis..."):
-                        prompt = f"Beri nilai angka 0-100 saja untuk jawaban mahasiswa di matkul {matkul_pilihan}: {jawaban_mhs}. HANYA ANGKA SAJA."
-                        hasil_ai = panggil_ai(prompt)
-                        
-                        # Ambil angka saja dari jawaban AI
-                        skor = ''.join(filter(str.isdigit, hasil_ai))
-                        
-                        if skor:
+                        try:
+                            # MENGGUNAKAN NAMA MODEL YANG PALING UMUM (GEMINI-1.5-FLASH)
+                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            prompt = f"Berikan skor angka antara 0 sampai 100 berdasarkan kualitas jawaban mahasiswa berikut untuk mata kuliah {matkul_pilihan}: '{jawaban_mhs}'. Balas HANYA dengan angka saja."
+                            
+                            response = model.generate_content(prompt)
+                            # Membersihkan hasil agar hanya angka yang tersisa
+                            skor_raw = response.text.strip()
+                            skor = ''.join(filter(str.isdigit, skor_raw))
+                            
+                            # Validasi: Jika skor yang keluar aneh (seperti 403 atau kosong)
+                            if not skor or int(skor) > 100:
+                                skor = "Cek Manual"
+
                             st.session_state.rekap_nilai.append({
                                 "Nama": nama_input, "Matkul": matkul_pilihan, 
                                 "Ujian": jenis_tes, "Nilai": skor, "Waktu": datetime.now().strftime("%H:%M")
                             })
                             st.success(f"Ujian Terkirim! Skor Anda: {skor}")
-                        else:
-                            st.error(f"Koreksi Gagal: {hasil_ai}")
+                        except Exception as e:
+                            st.error(f"Koneksi AI Terputus. Nilai akan diinput manual oleh Bapak Dosen.")
 
         elif nav == "🤖 Tanya AI":
             st.title("🤖 Asisten AI")
             tanya = st.text_input("Ketik pertanyaan Anda:")
             if tanya:
                 with st.spinner("Berpikir..."):
-                    jawaban = panggil_ai(tanya)
-                    st.write(jawaban)
+                    try:
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        res = model.generate_content(tanya)
+                        st.write(res.text)
+                    except:
+                        st.error("Layanan AI sedang sibuk.")
 
-# --- PANEL DOSEN ---
+# --- 5. PANEL DOSEN ---
 if pwd_dosen == PASSWORD_DOSEN:
     st.markdown("---")
     st.header("👨‍🏫 Rekap Nilai Dosen")
